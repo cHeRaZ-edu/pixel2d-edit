@@ -50,12 +50,18 @@ class MainActivity : Activity() {
         root.addView(editPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM))
         setContentView(root)
 
-        palette.onSelect = { id ->
+        palette.onSelect = { id, w, h ->
             mapView.selectedTile = id
+            mapView.stampW = w
+            mapView.stampH = h
             // Elegir un tile implica querer pintarlo.
             if (mapView.tool != Tool.PEN && mapView.tool != Tool.FILL) selectTool(Tool.PEN)
         }
-        mapView.onPicked = { id -> palette.selected = id; selectTool(Tool.PEN) }
+        mapView.onPicked = { id ->
+            palette.setSelection(id, 1, 1)
+            mapView.stampW = 1; mapView.stampH = 1
+            selectTool(Tool.PEN)
+        }
         mapView.onChanged = { refreshUndo() }
         selectLayer(Layer.GROUND)
         selectTool(Tool.PEN)
@@ -121,6 +127,13 @@ class MainActivity : Activity() {
             toolChips[t] = c
             tools.addView(c)
         }
+        lateinit var autoChip: TextView
+        autoChip = chip("Copa→Encima") {
+            mapView.autoAbove = !mapView.autoAbove
+            autoChip.background = chipBg(mapView.autoAbove)
+        }
+        autoChip.background = chipBg(mapView.autoAbove)
+        tools.addView(autoChip)
         panel.addView(scrollRow(tools))
         val scroll = ScrollView(this).apply { addView(palette) }
         panel.addView(scroll, LinearLayout.LayoutParams(MATCH, px(170)).apply { topMargin = px(4) })

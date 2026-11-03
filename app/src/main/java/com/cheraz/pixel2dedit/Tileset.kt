@@ -11,6 +11,17 @@ class Tileset(val bitmap: Bitmap, val tileSize: Int) {
     val rows = bitmap.height / tileSize
     val count = cols * rows
 
+    /** Tiles 100% transparentes: un sello no los escribe, así no borra lo que hay debajo. */
+    private val empty = BooleanArray(count).also { e ->
+        val px = IntArray(tileSize * tileSize)
+        for (id in 0 until count) {
+            bitmap.getPixels(px, 0, tileSize, (id % cols) * tileSize, (id / cols) * tileSize, tileSize, tileSize)
+            e[id] = px.all { (it ushr 24) == 0 }
+        }
+    }
+
+    fun isEmpty(id: Int) = id !in 0 until count || empty[id]
+
     fun src(id: Int, out: Rect): Rect {
         val cx = (id % cols) * tileSize
         val cy = (id / cols) * tileSize

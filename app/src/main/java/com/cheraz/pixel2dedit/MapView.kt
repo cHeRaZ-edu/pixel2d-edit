@@ -34,7 +34,12 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
     val history = History()
     var layer = Layer.GROUND
     var tool = Tool.PEN
+    /** Esquina superior izquierda del sello elegido en la paleta, y su tamaño en tiles. */
     var selectedTile = 0
+    var stampW = 1
+    var stampH = 1
+    /** En Deco, las filas de arriba del sello (copa, techo) van a Encima. */
+    var autoAbove = true
     var showGrid = true
 
     /** Avisa a la UI (botones de undo/redo, paleta). */
@@ -165,6 +170,10 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
     private val stroke = mutableListOf<CellChange>()
     private var lastCx = -1
     private var lastCy = -1
+    // Origen del trazo y sellos ya puestos en él (los sellos quedan alineados a su tamaño).
+    private var strokeX0 = 0
+    private var strokeY0 = 0
+    private val stamped = HashSet<Long>()
     // Línea base del pan/zoom
     private var panSpan = 0f
     private var panZoom = 0f
@@ -177,8 +186,10 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
             MotionEvent.ACTION_DOWN -> {
                 gesture = Gesture.PAINT
                 stroke.clear()
+                stamped.clear()
                 val (cx, cy) = cellAt(e.x, e.y)
                 lastCx = cx; lastCy = cy
+                strokeX0 = cx; strokeY0 = cy
                 when (tool) {
                     Tool.PEN, Tool.ERASE -> paintCell(cx, cy)
                     Tool.FILL -> { fill(cx, cy); commitStroke() }
@@ -253,19 +264,47 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
         return Pair(floor(wx / ts).toInt(), floor(wy / ts).toInt())
     }
 
-    private fun penValue() = if (layer == Layer.COLLISION) 1 else selectedTile
     private fun eraseValue() = if (layer == Layer.COLLISION) 0 else -1
 
-    private fun setCell(i: Int, v: Int) {
-        val old = map.get(layer, i)
+    private fun stampTile(dx: Int, dy: Int) = selectedTile + dy * tileset.cols + dx
+
+    private fun setCell(l: Layer, i: Int, v: Int) {
+        val old = map.get(l, i)
         if (old == v) return
-        map.set(layer, i, v)
-        stroke.add(CellChange(layer, i, old, v))
+        map.set(l, i, v)
+        stroke.add(CellChange(l, i, old, v))
     }
 
     private fun paintCell(cx: Int, cy: Int) {
+        if (tool == Tool.ERASE) { eraseCell(cx, cy); return }
+        if (layer == Layer.COLLISION) {
+            if (map.inside(cx, cy)) setCell(layer, map.idx(cx, cy), 1)
+            return
+        }
+        // Al arrastrar, los sellos caen en una rejilla de su tamaño: no se encima uno con otro.
+        val ox = strokeX0 + Math.floorDiv(cx - strokeX0, stampW) * stampW
+        val oy = strokeY0 + Math.floorDiv(cy - strokeY0, stampH) * stampH
+        if (!stamped.add((ox.toLong() shl 32) or (oy.toLong() and 0xffffffffL))) return
+        stamp(ox, oy)
+    }
+
+    private fun stamp(ox: Int, oy: Int) {
+        for (dy in 0 until stampH) for (dx in 0 until stampW) {
+            val x = ox + dx; val y = oy + dy
+            if (!map.inside(x, y)) continue
+            val id = stampTile(dx, dy)
+            if (tileset.isEmpty(id)) continue
+            val target = if (autoAbove && layer == Layer.DECO && dy < stampH - 1) Layer.ABOVE else layer
+            setCell(target, map.idx(x, y), id)
+        }
+    }
+
+    private fun eraseCell(cx: Int, cy: Int) {
         if (!map.inside(cx, cy)) return
-        setCell(map.idx(cx, cy), if (tool == Tool.ERASE) eraseValue() else penValue())
+        val i = map.idx(cx, cy)
+        setCell(layer, i, eraseValue())
+        // Si la copa se fue sola a Encima, borrar en Deco también la quita.
+        if (autoAbove && layer == Layer.DECO) setCell(Layer.ABOVE, i, -1)
     }
 
     /** Bresenham para que un trazo rápido no deje huecos. */
@@ -287,15 +326,18 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
     private fun fill(cx: Int, cy: Int) {
         if (!map.inside(cx, cy)) return
         val target = map.get(layer, map.idx(cx, cy))
-        val v = penValue()
-        if (target == v) return
+        val visited = BooleanArray(map.w * map.h)
         val stack = ArrayDeque<Int>()
         stack.addLast(map.idx(cx, cy))
         while (stack.isNotEmpty()) {
             val i = stack.removeLast()
-            if (map.get(layer, i) != target) continue
-            setCell(i, v)
+            if (visited[i] || map.get(layer, i) != target) continue
+            visited[i] = true
             val x = i % map.w; val y = i / map.w
+            // Con un sello de varios tiles, el relleno repite el patrón (ej. bosque 2×2).
+            val v = if (layer == Layer.COLLISION) 1
+                else stampTile(Math.floorMod(x - cx, stampW), Math.floorMod(y - cy, stampH))
+            setCell(layer, i, v)
             if (x > 0) stack.addLast(i - 1)
             if (x < map.w - 1) stack.addLast(i + 1)
             if (y > 0) stack.addLast(i - map.w)
