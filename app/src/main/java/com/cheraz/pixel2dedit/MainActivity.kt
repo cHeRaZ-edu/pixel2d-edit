@@ -19,7 +19,8 @@ import java.io.File
 
 class MainActivity : Activity() {
 
-    private lateinit var tileset: Tileset
+    private lateinit var library: TileLibrary
+    private val packChips = mutableListOf<TextView>()
     private lateinit var mapView: MapView
     private lateinit var palette: PaletteView
     private lateinit var stick: PlayStick
@@ -37,9 +38,9 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        tileset = Tileset.fromAsset(this, "tinytown")
-        mapView = MapView(this, tileset, loadAutosave() ?: TileMap.blank(40, 30))
-        palette = PaletteView(this, tileset)
+        library = TileLibrary.load(this)
+        mapView = MapView(this, library, loadAutosave() ?: TileMap.blank(40, 30))
+        palette = PaletteView(this, library.packs[0].tileset)
         stick = PlayStick(this) { x, y -> mapView.inputX = x; mapView.inputY = y }
 
         val root = FrameLayout(this)
@@ -60,6 +61,7 @@ class MainActivity : Activity() {
             setPanMode(false)
         }
         mapView.onPicked = { id ->
+            library.pack(id)?.let { showPack(library.packs.indexOf(it)) }
             palette.setSelection(id, 1, 1)
             mapView.stampW = 1; mapView.stampH = 1
             selectTool(Tool.PEN)
@@ -68,6 +70,7 @@ class MainActivity : Activity() {
         selectLayer(Layer.GROUND)
         selectTool(Tool.PEN)
         setPanMode(true)
+        showPack(0)
         refreshUndo()
     }
 
@@ -139,6 +142,13 @@ class MainActivity : Activity() {
         autoChip.background = chipBg(mapView.autoAbove)
         tools.addView(autoChip)
         panel.addView(scrollRow(tools))
+        val packs = LinearLayout(this)
+        library.packs.forEachIndexed { i, p ->
+            val c = chip(p.label) { showPack(i) }
+            packChips += c
+            packs.addView(c)
+        }
+        panel.addView(scrollRow(packs))
         val scroll = ScrollView(this).apply { addView(palette) }
         panel.addView(scroll, LinearLayout.LayoutParams(MATCH, px(170)).apply { topMargin = px(4) })
         return panel
@@ -175,6 +185,12 @@ class MainActivity : Activity() {
         toolChips[Tool.PICK]?.alpha = if (l == Layer.COLLISION) 0.4f else 1f
         if (l == Layer.COLLISION && mapView.tool == Tool.PICK) selectTool(Tool.PEN)
         mapView.invalidate()
+    }
+
+    private fun showPack(i: Int) {
+        val p = library.packs[i]
+        palette.showPack(p.tileset, p.offset)
+        packChips.forEachIndexed { k, c -> c.background = chipBg(k == i) }
     }
 
     private fun setPanMode(on: Boolean) {

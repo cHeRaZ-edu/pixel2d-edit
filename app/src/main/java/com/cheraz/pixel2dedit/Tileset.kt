@@ -42,3 +42,43 @@ class Tileset(val bitmap: Bitmap, val tileSize: Int) {
         }
     }
 }
+
+/** Un pack dentro de la biblioteca. Sus tiles usan IDs globales offset..offset+count-1. */
+class Pack(val key: String, val label: String, val tileset: Tileset, val offset: Int)
+
+/**
+ * Todos los packs juntos. ID global = índice del pack * STRIDE + ID local, así un mapa puede
+ * mezclar packs y agregar uno nuevo no mueve los IDs de los que ya existen (Pueblo = 0.., como antes).
+ */
+class TileLibrary(val packs: List<Pack>) {
+    val tileSize = packs.first().tileset.tileSize
+
+    fun pack(id: Int): Pack? {
+        if (id < 0) return null
+        val p = packs.getOrNull(id / STRIDE) ?: return null
+        return if (id - p.offset < p.tileset.count) p else null
+    }
+
+    fun isEmpty(id: Int): Boolean {
+        val p = pack(id) ?: return true
+        return p.tileset.isEmpty(id - p.offset)
+    }
+
+    /** Tile (dx, dy) de un sello cuya esquina es [base], dentro del mismo pack. */
+    fun stampTile(base: Int, dx: Int, dy: Int): Int =
+        base + dy * (pack(base)?.tileset?.cols ?: 1) + dx
+
+    companion object {
+        const val STRIDE = 1000
+
+        fun load(ctx: Context) = TileLibrary(
+            listOf(
+                "tinytown" to "Pueblo",
+                "tinydungeon" to "Mazmorra",
+                "tinyfarm" to "Granja"
+            ).mapIndexed { i, (key, label) ->
+                Pack(key, label, Tileset.fromAsset(ctx, key), i * STRIDE)
+            }
+        )
+    }
+}

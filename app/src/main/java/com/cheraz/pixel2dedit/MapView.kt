@@ -26,7 +26,7 @@ enum class Tool(val label: String) {
  * Lienzo del mapa. En modo edición: 1 dedo pinta, 2 dedos mueven y hacen zoom.
  * En modo jugar: un cuadrado se mueve con el joystick y choca con la capa de colisión.
  */
-class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(context) {
+class MapView(context: Context, var tileset: TileLibrary, initial: TileMap) : View(context) {
 
     var map: TileMap = initial
         set(v) { field = v; history.clear(); fitView(); notifyChanged() }
@@ -143,15 +143,14 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
     }
 
     private fun drawTiles(c: Canvas, layerTiles: IntArray, x0: Int, y0: Int, x1: Int, y1: Int) {
-        val bmp = tileset.bitmap
         for (y in y0..y1) {
             val top = edgeY(y)
             val bottom = edgeY(y + 1)
             for (x in x0..x1) {
                 val id = layerTiles[map.idx(x, y)]
-                if (id < 0 || id >= tileset.count) continue
+                val p = tileset.pack(id) ?: continue
                 dst.set(edgeX(x), top, edgeX(x + 1), bottom)
-                c.drawBitmap(bmp, tileset.src(id, src), dst, tilePaint)
+                c.drawBitmap(p.tileset.bitmap, p.tileset.src(id - p.offset, src), dst, tilePaint)
             }
         }
     }
@@ -271,7 +270,7 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
 
     private fun eraseValue() = if (layer == Layer.COLLISION) 0 else -1
 
-    private fun stampTile(dx: Int, dy: Int) = selectedTile + dy * tileset.cols + dx
+    private fun stampTile(dx: Int, dy: Int) = tileset.stampTile(selectedTile, dx, dy)
 
     private fun setCell(l: Layer, i: Int, v: Int) {
         val old = map.get(l, i)

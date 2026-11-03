@@ -23,6 +23,15 @@ class PaletteView(context: Context, var tileset: Tileset) : View(context) {
         private set
     var selH = 1
         private set
+    /** ID global del primer tile del pack que se está mostrando. */
+    var offset = 0
+        private set
+
+    fun showPack(ts: Tileset, off: Int) {
+        tileset = ts; offset = off
+        requestLayout(); invalidate()
+    }
+
     var dimmed = false
         set(v) { field = v; invalidate() }
     var onSelect: ((id: Int, w: Int, h: Int) -> Unit)? = null
@@ -67,7 +76,7 @@ class PaletteView(context: Context, var tileset: Tileset) : View(context) {
         val c0 = minOf(anchorC, c); val r0 = minOf(anchorR, r)
         val w = (kotlin.math.abs(c - anchorC) + 1).coerceAtMost(6)
         val h = (kotlin.math.abs(r - anchorR) + 1).coerceAtMost(6)
-        setSelection(r0 * tileset.cols + c0, w, h)
+        setSelection(offset + r0 * tileset.cols + c0, w, h)
     }
 
     private fun cell(): Int = if (width > 0) width / tileset.cols else (40 * dp).toInt()
@@ -92,9 +101,12 @@ class PaletteView(context: Context, var tileset: Tileset) : View(context) {
             c.drawRect((x + h).toFloat(), (y + h).toFloat(), (x + s).toFloat(), (y + s).toFloat(), checkA)
             c.drawBitmap(tileset.bitmap, tileset.src(id, src), dst, tilePaint)
         }
-        val sx = (selected % tileset.cols) * s
-        val sy = (selected / tileset.cols) * s
-        c.drawRect(sx + 2f, sy + 2f, sx + s * selW - 2f, sy + s * selH - 2f, selPaint)
+        val local = selected - offset
+        if (local in 0 until tileset.count) { // la selección puede ser de otro pack
+            val sx = (local % tileset.cols) * s
+            val sy = (local / tileset.cols) * s
+            c.drawRect(sx + 2f, sy + 2f, sx + s * selW - 2f, sy + s * selH - 2f, selPaint)
+        }
         if (dimmed) c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), dimPaint)
     }
 
@@ -120,7 +132,7 @@ class PaletteView(context: Context, var tileset: Tileset) : View(context) {
                     onSelect?.invoke(selected, selW, selH)
                 } else if (abs(e.x - downX) < slop && abs(e.y - downY) < slop && !dimmed) {
                     val (c, r) = cellAt(e.x, e.y)
-                    setSelection(r * tileset.cols + c, 1, 1)
+                    setSelection(offset + r * tileset.cols + c, 1, 1)
                     onSelect?.invoke(selected, 1, 1)
                 }
             }
