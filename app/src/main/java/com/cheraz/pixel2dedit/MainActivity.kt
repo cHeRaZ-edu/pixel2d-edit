@@ -27,6 +27,7 @@ class MainActivity : Activity() {
     private lateinit var playBtn: TextView
     private lateinit var undoBtn: TextView
     private lateinit var redoBtn: TextView
+    private lateinit var modeBtn: TextView
     private val editOnly = mutableListOf<View>()
     private val layerChips = mutableMapOf<Layer, TextView>()
     private val toolChips = mutableMapOf<Tool, TextView>()
@@ -56,6 +57,7 @@ class MainActivity : Activity() {
             mapView.stampH = h
             // Elegir un tile implica querer pintarlo.
             if (mapView.tool != Tool.PEN && mapView.tool != Tool.FILL) selectTool(Tool.PEN)
+            setPanMode(false)
         }
         mapView.onPicked = { id ->
             palette.setSelection(id, 1, 1)
@@ -65,6 +67,7 @@ class MainActivity : Activity() {
         mapView.onChanged = { refreshUndo() }
         selectLayer(Layer.GROUND)
         selectTool(Tool.PEN)
+        setPanMode(true)
         refreshUndo()
     }
 
@@ -94,6 +97,7 @@ class MainActivity : Activity() {
         }
         playBtn = chip("▶ Jugar") { togglePlay() }
         bar.addView(playBtn)
+        modeBtn = chip("") { setPanMode(!mapView.panMode) }.also { editOnly += it; bar.addView(it) }
         undoBtn = chip("↶") { mapView.undo() }.also { editOnly += it; bar.addView(it) }
         redoBtn = chip("↷") { mapView.redo() }.also { editOnly += it; bar.addView(it) }
         chip("Rejilla") {
@@ -123,7 +127,7 @@ class MainActivity : Activity() {
         panel.addView(scrollRow(layers))
         val tools = LinearLayout(this)
         for (t in Tool.values()) {
-            val c = chip(t.label) { selectTool(t) }
+            val c = chip(t.label) { selectTool(t); setPanMode(false) }
             toolChips[t] = c
             tools.addView(c)
         }
@@ -171,6 +175,12 @@ class MainActivity : Activity() {
         toolChips[Tool.PICK]?.alpha = if (l == Layer.COLLISION) 0.4f else 1f
         if (l == Layer.COLLISION && mapView.tool == Tool.PICK) selectTool(Tool.PEN)
         mapView.invalidate()
+    }
+
+    private fun setPanMode(on: Boolean) {
+        mapView.panMode = on
+        modeBtn.text = if (on) "✋ Mover" else "✎ Pintar"
+        modeBtn.background = chipBg(!on)
     }
 
     private fun selectTool(t: Tool) {

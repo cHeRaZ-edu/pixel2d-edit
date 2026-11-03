@@ -41,6 +41,8 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
     /** En Deco, las filas de arriba del sello (copa, techo) van a Encima. */
     var autoAbove = true
     var showGrid = true
+    /** Modo Mover: un dedo arrastra el mapa, nunca pinta. */
+    var panMode = true
 
     /** Avisa a la UI (botones de undo/redo, paleta). */
     var onChanged: (() -> Unit)? = null
@@ -183,7 +185,10 @@ class MapView(context: Context, var tileset: Tileset, initial: TileMap) : View(c
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (playing) return false
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
+            MotionEvent.ACTION_DOWN -> if (panMode) {
+                gesture = Gesture.PAN
+                beginPan(e, -1)
+            } else {
                 gesture = Gesture.PAINT
                 stroke.clear()
                 stamped.clear()

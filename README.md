@@ -30,7 +30,8 @@ Regla: una sección abierta a la vez; ningún hito se cierra sin algo jugable.
 
 ## Hito 1 — cómo se usa
 
-- **1 dedo** pinta con la herramienta activa; **2 dedos** mueven y hacen zoom.
+- **✋ Mover / ✎ Pintar** (botón de arriba): en Mover un dedo arrastra el mapa y no pinta nada.
+  Elegir un tile o una herramienta cambia solo a Pintar. En cualquier modo, 2 dedos mueven y hacen zoom.
 - **Capas:** Suelo, Deco, Encima (se dibuja sobre el player) y Colisión (rojo = sólido).
 - **Herramientas:** Lápiz, Borrar, Relleno, Gotero (toma el tile de una celda), Spawn (dónde aparece el player).
 - **Sellos de varios tiles:** en la paleta, mantén presionado y arrastra para elegir un rectángulo
